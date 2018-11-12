@@ -219,20 +219,16 @@ int main( void )
 	if( xQueue != NULL )
 	{
 		// Luminosidade
-		xTaskCreate( lightSensor, "Sender1", 240, NULL, 1, NULL );
+		xTaskCreate( lightSensor, "LightSensor", 240, NULL, 2, NULL );
 		// Trimpot
-		xTaskCreate( trimpot, "Sender2", 240, NULL, 2, NULL );
+		xTaskCreate( trimpot, "Trimpot", 240, NULL, 2, NULL );
 
-		xTaskCreate( vLed, "Led", 240, NULL, 2, NULL );
+		xTaskCreate( vLed, "Led", 240, NULL, 3, NULL );
 
 		xTaskCreate( vDisplay, "Display", 240, NULL, 1, NULL );
 
 		/* Start the scheduler so the created tasks start executing. */
 		vTaskStartScheduler();
-	}
-	else
-	{
-		/* The queue could not be created. */
 	}
 
     for( ;; );
@@ -243,11 +239,11 @@ int main( void )
 // Sensor de Luminosidade
 static void lightSensor( void *pvParameters )
 {
-portBASE_TYPE xStatus;
-const portTickType xTicksToWait = 100 / portTICK_RATE_MS;
+	portBASE_TYPE xStatus;
+	const portTickType xTicksToWait = 100 / portTICK_RATE_MS;
 
-struct sensor lightSensor;
-lightSensor.sensor = 0;
+	struct sensor lightSensor;
+	lightSensor.sensor = 0;
 
 	for( ;; )
 	{
@@ -260,11 +256,11 @@ lightSensor.sensor = 0;
 
 static void trimpot( void *pvParameters )
 {
-const portTickType xTicksToWait = 100 / portTICK_RATE_MS;
-portBASE_TYPE xStatus;
+	const portTickType xTicksToWait = 100 / portTICK_RATE_MS;
+	portBASE_TYPE xStatus;
 
-struct sensor trimpot;
-trimpot.sensor = 1;
+	struct sensor trimpot;
+	trimpot.sensor = 1;
 
 	for( ;; )
 	{
@@ -281,19 +277,14 @@ trimpot.sensor = 1;
 /*-----------------------------------------------------------*/
 static void vDisplay( void *pvParameters )
 {
-/* Declare the variable that will hold the values received from the queue. */
-struct sensor receivedSensor;
-portBASE_TYPE xStatus;
+	/* Declare the variable that will hold the values received from the queue. */
+	struct sensor receivedSensor;
+	portBASE_TYPE xStatus;
 
 	/* This task is also defined within an infinite loop. */
 	for( ;; )
 	{
-		//if( uxQueueMessagesWaiting( xQueue ) != 0 )
-		//{
-		//	vPrintString( "Queue should have been empty!\r\n" );
-		//}
-
-		xStatus = xQueueReceive( xQueue, &receivedSensor, 0 );
+		xStatus = xQueuePeek( xQueue, &receivedSensor, 0 );
 
 		if( xStatus == pdPASS )
 		{
@@ -303,33 +294,33 @@ portBASE_TYPE xStatus;
 			vPrintStringAndNumber( "Sensor = ", receivedSensor.sensor );
 			vPrintStringAndNumber( "Value = ", receivedSensor.data );
 
-			if (receivedSensor.sensor == 0){
-				intToString(receivedSensor.data, buf, 10, 10);
-				oled_fillRect((1+9*6),9, 80, 16, OLED_COLOR_WHITE);
-				oled_putString((1+9*6),9, buf, OLED_COLOR_BLACK, OLED_COLOR_WHITE);
-			} else {
-				intToString(receivedSensor.data, buf, 10, 10);
-				oled_fillRect((1+9*6),17, 80, 24, OLED_COLOR_WHITE);
-				oled_putString((1+9*6),17, buf, OLED_COLOR_BLACK, OLED_COLOR_WHITE);
+			switch(receivedSensor.sensor){
+				case 0:
+					intToString(receivedSensor.data, buf, 10, 10);
+					oled_fillRect((1+9*6),9, 80, 16, OLED_COLOR_WHITE);
+					oled_putString((1+9*6),9, buf, OLED_COLOR_BLACK, OLED_COLOR_WHITE);
+					break;
+				case 1:
+					intToString(receivedSensor.data, buf, 10, 10);
+					oled_fillRect((1+9*6),17, 80, 24, OLED_COLOR_WHITE);
+					oled_putString((1+9*6),17, buf, OLED_COLOR_BLACK, OLED_COLOR_WHITE);
+					break;
 			}
 		}
+
+		vTaskDelay(200);
 	}
 }
 
 static void vLed( void *pvParameters )
 {
-/* Declare the variable that will hold the values received from the queue. */
-struct sensor receivedSensor;
-portBASE_TYPE xStatus;
+	/* Declare the variable that will hold the values received from the queue. */
+	struct sensor receivedSensor;
+	portBASE_TYPE xStatus;
 
 	/* This task is also defined within an infinite loop. */
 	for( ;; )
 	{
-		//if( uxQueueMessagesWaiting( xQueue ) != 0 )
-		//{
-		//	vPrintString( "Queue should have been empty!\r\n" );
-		//}
-
 		xStatus = xQueueReceive( xQueue, &receivedSensor, 0 );
 
 		if( xStatus == pdPASS )
@@ -342,9 +333,7 @@ portBASE_TYPE xStatus;
 			}
 		}
 
-		xStatus = xQueueSendToFront( xQueue, &receivedSensor, 0);
-
-		vTaskDelay(50);
+		vTaskDelay(100);
 	}
 
 }
