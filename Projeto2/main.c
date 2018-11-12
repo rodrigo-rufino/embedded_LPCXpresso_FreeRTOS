@@ -1,8 +1,6 @@
 /*
     FreeRTOS V6.1.1 - Copyright (C) 2011 Real Time Engineers Ltd.
-
     This file is part of the FreeRTOS distribution.
-
     FreeRTOS is free software; you can redistribute it and/or modify it under
     the terms of the GNU General Public License (version 2) as published by the
     Free Software Foundation AND MODIFIED BY the FreeRTOS exception.
@@ -17,15 +15,11 @@
     can be viewed here: http://www.freertos.org/a00114.html and also obtained
     by writing to Richard Barry, contact details for whom are available on the
     FreeRTOS WEB site.
-
     1 tab == 4 spaces!
-
     http://www.FreeRTOS.org - Documentation, latest information, license and
     contact details.
-
     http://www.SafeRTOS.com - A version that is certified for use in safety
     critical systems.
-
     http://www.OpenRTOS.com - Commercial support, development, porting,
     licensing and training services.
 */
@@ -55,18 +49,20 @@
 
 static void lightSensor( void *pvParameters );
 static void trimpot( void *pvParameters );
-static void vReceiver( void *pvParameters );
+static void vLed( void *pvParameters );
+static void vDisplay( void *pvParameters );
 
 xQueueHandle xQueue;
-int valor1=100, valor2=200;
+int flagLED = 0;
 static uint8_t buf[10];
+
+xTaskHandle xTaskLedHandle;
 
 struct sensor
 {
 	uint8_t sensor;
     uint32_t data;
 };
-
 
 static void init_ssp(void)
 {
@@ -227,7 +223,9 @@ int main( void )
 		// Trimpot
 		xTaskCreate( trimpot, "Sender2", 240, NULL, 2, NULL );
 
-		xTaskCreate( vReceiver, "Receiver", 240, NULL, 1, NULL );
+		xTaskCreate( vLed, "Led", 240, NULL, 2, NULL );
+
+		xTaskCreate( vDisplay, "Display", 240, NULL, 1, NULL );
 
 		/* Start the scheduler so the created tasks start executing. */
 		vTaskStartScheduler();
@@ -240,6 +238,7 @@ int main( void )
     for( ;; );
 	return 0;
 }
+
 /*-----------------------------------------------------------*/
 // Sensor de Luminosidade
 static void lightSensor( void *pvParameters )
@@ -278,9 +277,9 @@ trimpot.sensor = 1;
 		vTaskDelay(500);
 	}
 }
-/*-----------------------------------------------------------*/
 
-static void vReceiver( void *pvParameters )
+/*-----------------------------------------------------------*/
+static void vDisplay( void *pvParameters )
 {
 /* Declare the variable that will hold the values received from the queue. */
 struct sensor receivedSensor;
@@ -312,12 +311,40 @@ portBASE_TYPE xStatus;
 				intToString(receivedSensor.data, buf, 10, 10);
 				oled_fillRect((1+9*6),17, 80, 24, OLED_COLOR_WHITE);
 				oled_putString((1+9*6),17, buf, OLED_COLOR_BLACK, OLED_COLOR_WHITE);
+			}
+		}
+	}
+}
 
+static void vLed( void *pvParameters )
+{
+/* Declare the variable that will hold the values received from the queue. */
+struct sensor receivedSensor;
+portBASE_TYPE xStatus;
+
+	/* This task is also defined within an infinite loop. */
+	for( ;; )
+	{
+		//if( uxQueueMessagesWaiting( xQueue ) != 0 )
+		//{
+		//	vPrintString( "Queue should have been empty!\r\n" );
+		//}
+
+		xStatus = xQueueReceive( xQueue, &receivedSensor, 0 );
+
+		if( xStatus == pdPASS )
+		{
+			if (receivedSensor.sensor == 1){
+				flagLED = receivedSensor.sensor;
 				if (receivedSensor.data >= 0.8*4096) {
 					rgb_setLeds(RGB_RED);
 				} else rgb_setLeds(RGB_GREEN);
 			}
 		}
+
+		xStatus = xQueueSendToFront( xQueue, &receivedSensor, 0);
+
+		vTaskDelay(50);
 	}
 
 }
@@ -350,4 +377,3 @@ void vApplicationTickHook( void )
 {
 	/* This example does not use the tick hook to perform any processing. */
 }
-
